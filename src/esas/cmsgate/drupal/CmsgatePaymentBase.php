@@ -53,8 +53,10 @@ abstract class CmsgatePaymentBase extends PaymentGatewayBase implements ManualPa
     {
         parent::submitConfigurationForm($form, $form_state);
         if (!$form_state->getErrors()) {
+            $fields = Registry::getRegistry()->getConfigForm()->getManagedFields()->getFieldsToRender();
             $values = $form_state->getValue($form['#parents']);
             foreach ($values as $key => $value) {
+                if (array_key_exists($key, $fields))
                 $this->configuration[$key] = $value;
             }
         }

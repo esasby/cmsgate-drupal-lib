@@ -17,7 +17,7 @@
   ],
   "require": {
     "php": ">= 5.6.0",
-    "esas/cmsgate-core": "~v1.15.0"
+    "esas/cmsgate-core": "~v1.15.1"
   },
   "autoload": {
     "psr-4": {

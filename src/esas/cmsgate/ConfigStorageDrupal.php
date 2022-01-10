@@ -8,23 +8,54 @@
 
 namespace esas\cmsgate;
 
+use Drupal\commerce_payment\Entity\PaymentGateway;
+use esas\cmsgate\utils\StringUtils;
 use Exception;
 
 class ConfigStorageDrupal extends ConfigStorageCms
 {
+    private $plugin;
     private $settings;
 
     public function __construct()
     {
-        parent::__construct();
-        $gateway = \Drupal::entityTypeManager()
+        parent::__construct(); // $GLOBALS["request"]->attributes->parameters["commerce_order"]->values["payment_gateway"]
+
+        $gateways = \Drupal::entityTypeManager()
             ->getStorage('commerce_payment_gateway')->loadByProperties([
                 'plugin' => Registry::getRegistry()->getModuleDescriptor()->getModuleMachineName(),
             ]);
-        $plugin = reset($gateway);
-        $this->settings = $plugin->getPluginConfiguration();
+        if (count($gateways) > 0) {
+            foreach ($gateways as $gateway) {
+                if ($this->isManagedGateway($gateway)) {
+                    $this->plugin = $gateway;
+                    break;
+                }
+            }
+        }
+        if ($this->plugin != null)
+            $this->settings = $this->plugin->getPluginConfiguration();
     }
 
+    /**
+     * @param PaymentGateway $gateway
+     * @return bool|null
+     */
+    private function isManagedGateway($gateway)
+    {
+        if ($_POST["form_id"] == 'commerce_payment_gateway_add_form') { //добавление нового платежного шлюза
+            $id = $_POST["id"];
+        } elseif (str_contains($_SERVER[REQUEST_URI], 'commerce/config/payment-gateways/manage')) { //редактирование платежного шлюза
+            $id = StringUtils::substrBetween($_SERVER[REQUEST_URI], '/manage/', '?');
+        } elseif ($GLOBALS["request"]->attributes->get("commerce_order") != null) //оплата заказа
+            $id = $GLOBALS["request"]->attributes->get("commerce_order")->get('payment_gateway')->first()->entity->id();
+        return $id === $gateway->id();
+    }
+
+    public function getPaymentGatewayId()
+    {
+        return $this->plugin->id();
+    }
 
     /**
      * @param $key
@@ -46,7 +77,7 @@ class ConfigStorageDrupal extends ConfigStorageCms
      */
     public function convertToBoolean($cmsConfigValue)
     {
-        return strtolower($cmsConfigValue) == 'yes'; // not reachable
+        return strtolower($cmsConfigValue) == '1';
     }
 
     /**
@@ -58,5 +89,23 @@ class ConfigStorageDrupal extends ConfigStorageCms
     public function saveConfig($key, $value)
     {
         // not implemented
+    }
+
+    public function getConstantConfigValue($key)
+    {
+        switch ($key) {
+            case ConfigFields::orderPaymentStatusPending():
+                return "cmsgate_pending";
+            case ConfigFields::orderPaymentStatusPayed():
+                return "cmsgate_payed";
+            case ConfigFields::orderPaymentStatusFailed():
+                return "cmsgate_failed";
+            case ConfigFields::orderPaymentStatusCanceled():
+                return "cmsgate_canceled";
+            case ConfigFields::sandbox():
+                return $this->settings != null && $this->settings['mode'] === 'test';
+            default:
+                return null;
+        }
     }
 }

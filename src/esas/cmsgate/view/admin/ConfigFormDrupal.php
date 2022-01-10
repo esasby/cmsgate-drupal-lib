@@ -9,8 +9,6 @@
 
 namespace esas\cmsgate\view\admin;
 
-use Drupal\state_machine\WorkflowManagerInterface;
-use Drupal\workflows\WorkflowInterface;
 use esas\cmsgate\CmsConnectorDrupal;
 use esas\cmsgate\ConfigFieldsDrupal;
 use esas\cmsgate\Registry;
@@ -31,53 +29,25 @@ class ConfigFormDrupal extends ConfigFormArray
     {
         parent::__construct($formKey, $managedFields);
 
-        /** @var WorkflowManagerInterface $workflowManager */
-        $workflowManager = \Drupal::getContainer()->get('plugin.manager.workflow');
-        /** @var WorkflowInterface[] $workflows */
-        $workflows = $workflowManager->getGroupedLabels('commerce_order');
-        foreach ($workflows as $workflow) {
-            foreach ($workflow->getTypePlugin()->getTransitions() as $transition) {
-                $this->orderStatuses[$transition->id()] = new ListOption($transition->id(), $transition->label());
-            }
-        }
-
-//        $workflows = $this->getWorkflows();
-        // Merge the states of all workflows into one list, preserving their
-        // initial positions.
+//        /** @var WorkflowManagerInterface $workflowManager */
+//        $workflowManager = \Drupal::getContainer()->get('plugin.manager.workflow');
+//        /** @var WorkflowInterface[] $workflows */
+//        $workflows = $workflowManager->getGroupedLabels('commerce_order');
 //        foreach ($workflows as $workflow) {
-//            foreach ($workflow->getStates() as $state_id => $state) {
-//                $this->orderStatuses[$state_id] = new ListOption($state_id, $state->getLabel());
+//            foreach ($workflow->getTypePlugin()->getTransitions() as $transition) {
+//                $this->orderStatuses[$transition->id()] = new ListOption($transition->id(), $transition->label());
 //            }
 //        }
-    }
 
-    protected function getWorkflows()
-    {
-        // Only the StateItem knows which workflow it's using. This requires us
-        // to create an entity for each bundle in order to get the state field.
-        $entity_type_id = 'commerce_order';
-        $entityTypeManager = \Drupal::getContainer()->get('entity_type.manager');
-        $entityFieldManager = \Drupal::getContainer()->get('entity_field.manager');
-        $entity_type = $entityTypeManager->getDefinition($entity_type_id);
-        $field_name = 'state';
-
-        $storage = $entityTypeManager->getStorage($entity_type->id());
-        $map = $entityFieldManager->getFieldMap();
-        $bundles = $map[$entity_type->id()][$field_name]['bundles'];
-        $workflows = [];
-        foreach ($bundles as $bundle) {
-            $values = [];
-            if ($bundle_key = $entity_type->getKey('bundle')) {
-                $values[$bundle_key] = $bundle;
-            }
-            /** @var \Drupal\Core\Entity\ContentEntityInterface $entity */
-            $entity = $storage->create($values);
-            if ($entity->hasField($field_name)) {
-                $workflow = $entity->get($field_name)->first()->getWorkflow();
-                $workflows[$workflow->getId()] = $workflow;
+        $workflows = CmsConnectorDrupal::getInstance()->getWorkflows();
+        foreach ($workflows as $workflow) {
+//            foreach ($workflow->getTransitions() as $key => $transition) {
+//                $this->orderStatuses[$key] = new ListOption($key, $transition->getLabel());
+//            }
+            foreach ($workflow->getStates() as $state_id => $state) {
+                $this->orderStatuses[$state_id] = new ListOption($state_id, $state->getLabel());
             }
         }
-        return $workflows;
     }
 
     /**
@@ -106,9 +76,10 @@ class ConfigFormDrupal extends ConfigFormArray
         $ret = array(
             '#title' => $configField->getName(),
             '#description' => $configField->getDescription());
-        if ($addDefault && $configField->hasDefault()) {
-            $ret['#default_value'] = $configField->getDefault();
-        }
+//        if ($addDefault && $configField->hasDefault()) {
+//            $ret['#default_value'] = $configField->getDefault();
+//        }
+        $ret['#default_value'] = $configField->getValue(true);
         if ($configField->isRequired())
             $ret['#required'] = true;
         return $ret;

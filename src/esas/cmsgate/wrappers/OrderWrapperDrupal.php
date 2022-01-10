@@ -36,8 +36,7 @@ class OrderWrapperDrupal extends OrderSafeWrapper
         $paymentStorage = \Drupal::entityTypeManager()->getStorage('commerce_payment');
         $payments = $paymentStorage->loadMultipleByOrder($this->order);
         foreach ($payments as $payment) {
-            if ($payment->getPaymentGatewayId() == Registry::getRegistry()->getModuleDescriptor()->getModuleMachineName()) //todo check
-            {
+            if ($payment->getPaymentGatewayId() == Registry::getRegistry()->getConfigStorage()->getPaymentGatewayId()) {
                 if ($this->lastPayment == null || $this->lastPayment->getOriginalId() < $payment->getOriginalId()) // payments has no created_at field
                     $this->lastPayment = $payment;
             }
@@ -50,12 +49,7 @@ class OrderWrapperDrupal extends OrderSafeWrapper
      */
     public function getOrderIdUnsafe()
     {
-        return $this->order->getOriginalId();
-    }
-
-    public function getOrderNumberUnsafe()
-    {
-        return $this->order->getOrderNumber();
+        return $this->order->id();
     }
 
     /**
@@ -158,7 +152,22 @@ class OrderWrapperDrupal extends OrderSafeWrapper
     {
         $this->lastPayment->setState($newOrderStatus->getPaymentStatus());
         $this->lastPayment->save();
-        $this->order->getState()->applyTransitionById($newOrderStatus->getOrderStatus());
+        if ($this->order->getState()->getOriginalId() === $newOrderStatus->getOrderStatus()) {
+            $this->logger->info("Order state is the same. No need to change");
+            return;
+        }
+        $workflows = CmsConnectorDrupal::getInstance()->getWorkflows();
+        foreach ($workflows as $workflow) {
+            foreach ($workflow->getTransitions() as $key => $transition) {
+                if ($transition->getToState()->getId() == $newOrderStatus->getOrderStatus() && array_key_exists($this->order->getState()->getOriginalId(), $transition->getFromStates())) {
+                    $this->order->getState()->applyTransitionById($transition->getId());
+                    return;
+                }
+            }
+        }
+        $this->logger->warn("Order status can not be changed by transition. Force change will be used. Please check order workflows");
+        $this->order->set('state', $newOrderStatus->getOrderStatus());
+        $this->order->save();
     }
 
     /**
