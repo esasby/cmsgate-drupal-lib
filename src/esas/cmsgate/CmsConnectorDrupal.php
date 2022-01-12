@@ -64,7 +64,7 @@ class CmsConnectorDrupal extends CmsConnector
         $query = $orderStorage->getQuery()
             ->condition('uid', \Drupal::currentUser()->id())
             ->sort('order_id', 'DESC')
-            ->range(1,1)
+            ->range(0,1)
             ->accessCheck(FALSE);
         $orderIds = $query->execute();
         return $this->createOrderWrapperByOrderId(reset($orderIds));
@@ -114,8 +114,8 @@ class CmsConnectorDrupal extends CmsConnector
         return new CmsConnectorDescriptor(
             "cmsgate-drupal-lib",
             new VersionDescriptor(
-                "v1.15.1",
-                "2022-01-10"
+                "v1.15.2",
+                "2022-01-12"
             ),
             "Cmsgate Drupal connector",
             "https://bitbucket.esas.by/projects/CG/repos/cmsgate-drupal-lib/browse",
@@ -184,5 +184,14 @@ class CmsConnectorDrupal extends CmsConnector
             }
         }
         return $workflows;
+    }
+
+    /**
+     * @return \Drupal\commerce_order\Entity\OrderInterface
+     */
+    public function getDrupalOrderFromSession() {
+        if ($GLOBALS["request"]->attributes->get("commerce_order") != null)
+            return $GLOBALS["request"]->attributes->get("commerce_order");
+        return null;
     }
 }

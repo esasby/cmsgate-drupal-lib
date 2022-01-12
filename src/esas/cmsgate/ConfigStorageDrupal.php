@@ -43,12 +43,16 @@ class ConfigStorageDrupal extends ConfigStorageCms
      */
     private function isManagedGateway($gateway)
     {
+        $id = '';
         if ($_POST["form_id"] == 'commerce_payment_gateway_add_form') { //добавление нового платежного шлюза
             $id = $_POST["id"];
         } elseif (str_contains($_SERVER[REQUEST_URI], 'commerce/config/payment-gateways/manage')) { //редактирование платежного шлюза
             $id = StringUtils::substrBetween($_SERVER[REQUEST_URI], '/manage/', '?');
-        } elseif ($GLOBALS["request"]->attributes->get("commerce_order") != null) //оплата заказа
-            $id = $GLOBALS["request"]->attributes->get("commerce_order")->get('payment_gateway')->first()->entity->id();
+        } else {
+            $sessionOrder = CmsConnectorDrupal::getInstance()->getDrupalOrderFromSession();
+            if ($sessionOrder != null)
+                $id = $sessionOrder->get('payment_gateway')->first()->entity->id();
+        }
         return $id === $gateway->id();
     }
 
